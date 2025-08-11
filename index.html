@@ -465,21 +465,7 @@ form.addEventListener('submit', async function (e) {
       console.warn('jsPDF not loaded — add <script src="...jspdf..."></script>');
     }
 
-    // reset UI and hide biodata until next unit select
-    form.reset();
-    document.getElementById('age').value = '';
-    document.getElementById('vin-group').classList.add('hidden');
-    document.getElementById('party-id-group').classList.add('hidden');
-    document.getElementById('timestamp-group').classList.add('hidden');
-    document.getElementById('state').value = '';
-    resetDropdown(document.getElementById('lga'));
-    resetDropdown(document.getElementById('ward'));
-    resetDropdown(document.getElementById('unit'));
-  } catch (err) {
-    console.error('RTDB write failed:', err);
-    alert('Registration failed — check console for details.');
-  }
-});
+    
 </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </body>
