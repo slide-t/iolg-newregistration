@@ -1,1 +1,461 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Group Member Registration</title>
+  <link rel="stylesheet" href="style.css"/>
+ <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+  /* Basic Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f7f9fc;
+  padding: 30px 15px;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h2, h3 {
+  text-align: center;
+  color: #003049;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+button {
+  background: #003049;
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background: #005073;
+}
+
+.hidden {
+  display: none;
+}
+
+.note {
+  font-size: 0.9em;
+  margin-top: 15px;
+  color: #555;
+  text-align: center;
+}
+
+a {
+  text-align: center;
+  display: block;
+  margin-top: 10px;
+  color: #005073;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Group Membership Registration</h2>
+
+    <!-- State Selection -->
+    <div class="form-group">
+      <label for="state">Select State:</label>
+      <select id="state" required>
+        <option value="">-- Select State --</option>
+        <option value="ogun">Ogun State</option>
+      </select>
+    </div>
+
+    <!-- LGA (activates after state) -->
+    <div class="form-group hidden" id="lga-group">
+      <label for="lga">Select Local Government:</label>
+      <select id="lga" required></select>
+    </div>
+
+    <!-- Ward (activates after LGA) -->
+    <div class="form-group hidden" id="ward-group">
+      <label for="ward">Select Ward:</label>
+      <select id="ward" required></select>
+    </div>
+
+    <!-- Polling Unit (activates after Ward) -->
+    <div class="form-group hidden" id="unit-group">
+      <label for="unit">Select Polling Unit:</label>
+      <select id="unit" required></select>
+    </div>
+
+    <!-- BioData (activates after Unit) -->
+    <form class="hidden" id="biodata-form">
+      <h3>Bio Data</h3>
+
+      <div class="form-group">
+        <label>Full Name:</label>
+        <input type="text" id="fullname" required />
+      </div>
+
+      <div class="form-group">
+        <label>Date of Birth:</label>
+        <input type="date" id="dob" required />
+      </div>
+
+      <div class="form-group">
+        <label>Age:</label>
+        <input type="text" id="age" disabled />
+      </div>
+
+      <div class="form-group">
+        <label>Phone Number:</label>
+        <input type="tel" id="phone" required />
+      </div>
+
+      <div class="form-group">
+        <label>Are you a registered voter?</label>
+        <select id="isVoter" required>
+          <option value="">-- Select --</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+
+      <div class="form-group hidden" id="vin-group">
+        <label>Enter Voter Identification Number (VIN):</label>
+        <input type="text" id="vin" />
+      </div>
+
+      <div class="form-group">
+        <label>Are you a registered party member?</label>
+        <select id="isPartyMember" required>
+          <option value="">-- Select --</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+
+      <div class="form-group hidden" id="party-id-group">
+        <label>Enter Party Membership ID:</label>
+        <input type="text" id="partyId" />
+      </div>
+
+      <div class="form-group">
+        <button type="submit">Register Member</button>
+      </div>
+
+      <!-- Admin only field -->
+      <div class="form-group hidden" id="timestamp-group">
+        <label>Registration Time (Admin Only):</label>
+        <input type="text" id="regTime" disabled />
+      </div>
+    </form>
+
+    <p class="note">
+      Only authorized Ward Secretaries or Chairmen can register members from their own ward.
+    </p>
+    <p><a href="admin.html">Go to Admin Dashboard</a></p>
+  </div>
+
+  <script>
+  // Sample LGA, Ward, Unit structure (2 Wards, 3 Units each)
+const data = {
+  ogun: {
+    "Ijebu Ode": {
+      "Ward 1": [
+        "001 - Cooperative Building (Existing)",
+        "002 - Emmanuel School I (Existing)",
+        "003 - Moslem School I (Existing)"
+      ],
+      "Ward 2": [
+        "004 - Front of Talabi’s House (Existing)",
+        "005 - Imoru Road Junction (Existing)",
+        "006 - Oke-Ola Ilorin (Existing)"
+      ]
+    }
+  }
+};
+
+// DOM Elements
+const stateEl = document.getElementById("state");
+const lgaEl = document.getElementById("lga");
+const wardEl = document.getElementById("ward");
+const unitEl = document.getElementById("unit");
+
+const lgaGroup = document.getElementById("lga-group");
+const wardGroup = document.getElementById("ward-group");
+const unitGroup = document.getElementById("unit-group");
+const biodataForm = document.getElementById("biodata-form");
+
+const dobEl = document.getElementById("dob");
+const ageEl = document.getElementById("age");
+
+const isVoterEl = document.getElementById("isVoter");
+const vinGroup = document.getElementById("vin-group");
+
+const isPartyEl = document.getElementById("isPartyMember");
+const partyIdGroup = document.getElementById("party-id-group");
+
+const regTime = document.getElementById("regTime");
+const timestampGroup = document.getElementById("timestamp-group");
+
+// State change
+stateEl.addEventListener("change", () => {
+  const state = stateEl.value;
+  resetDropdown(lgaEl);
+  resetDropdown(wardEl);
+  resetDropdown(unitEl);
+  hideElement(biodataForm);
+  hideElement(wardGroup);
+  hideElement(unitGroup);
+
+  if (data[state]) {
+    lgaGroup.classList.remove("hidden");
+    for (let lga in data[state]) {
+      const opt = document.createElement("option");
+      opt.value = lga;
+      opt.textContent = lga;
+      lgaEl.appendChild(opt);
+    }
+  }
+});
+
+// LGA change
+lgaEl.addEventListener("change", () => {
+  const state = stateEl.value;
+  const lga = lgaEl.value;
+  resetDropdown(wardEl);
+  resetDropdown(unitEl);
+  hideElement(unitGroup);
+  hideElement(biodataForm);
+
+  if (data[state] && data[state][lga]) {
+    wardGroup.classList.remove("hidden");
+    for (let ward in data[state][lga]) {
+      const opt = document.createElement("option");
+      opt.value = ward;
+      opt.textContent = ward;
+      wardEl.appendChild(opt);
+    }
+  }
+});
+
+// Ward change
+wardEl.addEventListener("change", () => {
+  const state = stateEl.value;
+  const lga = lgaEl.value;
+  const ward = wardEl.value;
+  resetDropdown(unitEl);
+  hideElement(biodataForm);
+
+  if (data[state] && data[state][lga][ward]) {
+    unitGroup.classList.remove("hidden");
+    data[state][lga][ward].forEach(unit => {
+      const opt = document.createElement("option");
+      opt.value = unit;
+      opt.textContent = unit;
+      unitEl.appendChild(opt);
+    });
+  }
+});
+
+// Unit change
+unitEl.addEventListener("change", () => {
+  if (unitEl.value) {
+    biodataForm.classList.remove("hidden");
+  }
+});
+
+// Date of Birth => Calculate Age
+dobEl.addEventListener("change", () => {
+  const dob = new Date(dobEl.value);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  ageEl.value = age;
+});
+
+// Toggle VIN
+isVoterEl.addEventListener("change", () => {
+  vinGroup.classList.toggle("hidden", isVoterEl.value !== "yes");
+});
+
+// Toggle Party ID
+isPartyEl.addEventListener("change", () => {
+  partyIdGroup.classList.toggle("hidden", isPartyEl.value !== "yes");
+});
+
+// Utility
+function resetDropdown(dropdown) {
+  dropdown.innerHTML = '<option value="">-- Select --</option>';
+}
+
+function hideElement(el) {
+  el.classList.add("hidden");
+}
+
+// Simulate Admin Role: Enable Timestamp
+document.addEventListener("DOMContentLoaded", () => {
+  const isAdmin = false; // CHANGE to true if logged in as Admin
+  if (isAdmin) {
+    timestampGroup.classList.remove("hidden");
+    regTime.value = new Date().toLocaleString();
+  }
+});
+// Firebase setup
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Step-by-step navigation
+function nextStep(step) {
+  document.querySelectorAll(".step").forEach(div => div.style.display = "none");
+  document.querySelector(`.step-${step}`).style.display = "block";
+}
+
+// Form submission
+document.getElementById("registrationForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const fullName = document.getElementById("fullName").value;
+  const email = document.getElementById("email").value;
+  const phone = document.getElementById("phone").value;
+
+  try {
+    // Save to Firestore
+    const docRef = await db.collection("registrations").add({
+      fullName, email, phone, timestamp: new Date()
+    });
+    alert("Registration successful!");
+
+    // Generate PDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.text("Registration Details", 10, 10);
+    doc.text(`Full Name: ${fullName}`, 10, 20);
+    doc.text(`Email: ${email}`, 10, 30);
+    doc.text(`Phone: ${phone}`, 10, 40);
+    doc.save("registration.pdf");
+
+  } catch (error) {
+    console.error("Error adding document: ", error);
+    alert("Error submitting form!");
+  }
+});
+  
+  </script>
+  <!-- Add jsPDF for PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+  // Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCZ1H5Hiyzgiuj_r_IzOsK4M6Yxu6_N8fg",
+    authDomain: "iolgregister.firebaseapp.com",
+    databaseURL: "https://iolgregister-default-rtdb.firebaseio.com",
+    projectId: "iolgregister",
+    storageBucket: "iolgregister.appspot.com",
+    messagingSenderId: "946784598325",
+    appId: "1:946784598325:web:e94029ad2322f4e0c3b47c"
+  };
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // Handle form submission
+  document.getElementById("biodata-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // Collect form data
+    const formData = {
+      state: document.getElementById("state").value,
+      lga: document.getElementById("lga").value,
+      ward: document.getElementById("ward").value,
+      unit: document.getElementById("unit").value,
+      fullname: document.getElementById("fullname").value,
+      dob: document.getElementById("dob").value,
+      age: document.getElementById("age").value,
+      phone: document.getElementById("phone").value,
+      isVoter: document.getElementById("isVoter").value,
+      vin: document.getElementById("vin").value || "",
+      isPartyMember: document.getElementById("isPartyMember").value,
+      partyId: document.getElementById("partyId").value || "",
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      // Save to Realtime Database
+      const newRef = db.ref("registrations").push();
+      await newRef.set(formData);
+
+      alert("Registration successful!");
+
+      // Generate PDF
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text("Group Membership Registration", 10, 10);
+
+      let yPos = 20;
+      Object.entries(formData).forEach(([key, value]) => {
+        doc.text(`${key}: ${value}`, 10, yPos);
+        yPos += 10;
+      });
+
+      doc.save(`registration_${formData.fullname}.pdf`);
+
+      // Reset form
+      e.target.reset();
+      document.getElementById("age").value = "";
+      document.getElementById("vin-group").classList.add("hidden");
+      document.getElementById("party-id-group").classList.add("hidden");
+
+    } catch (error) {
+      console.error("Error saving data: ", error);
+      alert("Error submitting registration!");
+    }
+  });
+</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</body>
+</html>
+
+
+
+
